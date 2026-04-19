@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Axiom</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/break_infinity.js@1.0.3/break_infinity.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+
+  <canvas id="particles-canvas"></canvas>
+  <div id="grid-layer"></div>
+
+  <!-- Top bar: N value + rate -->
+  <div id="topbar">
+    <span id="topbar-n">N: 0.000</span>
+    <div id="topbar-divider"></div>
+    <span id="topbar-rate">+0.000 / s</span>
+    <div id="topbar-seq-divider" class="topbar-divider" style="display:none"></div>
+    <span id="topbar-seq" style="display:none"></span>
+  </div>
+
+  <!-- Tab bar -->
+  <div id="tabbar">
+    <button class="tab active" data-tab="main">main</button>
+    <button class="tab" data-tab="sequences" id="tab-sequences" style="display:none">sequences</button>
+    <button class="tab" data-tab="iteration" id="tab-iteration" style="display:none">iteration</button>
+    <button class="tab" data-tab="settings">settings</button>
+    <button class="tab" data-tab="manual">manual</button>
+  </div>
+
+  <!-- Main panel -->
+  <div id="panel-main" class="panel active">
+    <div id="upgrade-column"></div>
+    <div id="prestige-column"></div>
+  </div>
+
+  <!-- Sequences panel -->
+  <div id="panel-sequences" class="panel">
+    <div id="sequences-column"></div>
+  </div>
+
+  <!-- Iteration panel -->
+  <div id="panel-iteration" class="panel">
+    <div id="iteration-column"></div>
+  </div>
+
+  <!-- Settings panel -->
+  <div id="panel-settings" class="panel">
+    <div id="settings-column">
+
+      <div class="settings-row">
+        <div class="settings-info">
+          <div class="settings-name">autosave interval</div>
+          <div class="settings-desc">how often the game saves automatically</div>
+        </div>
+        <button id="btn-autosave-interval" class="settings-btn">314s</button>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-info">
+          <div class="settings-name">export save</div>
+          <div class="settings-desc">copy current save data to clipboard</div>
+        </div>
+        <button id="btn-export" class="settings-btn">copy</button>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-info">
+          <div class="settings-name">import save</div>
+          <div class="settings-desc">paste save data to restore a previous state</div>
+        </div>
+        <div class="dev-input-group">
+          <input id="import-input" class="dev-input" type="text" placeholder="paste save data..." />
+          <button id="btn-import" class="settings-btn">load</button>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-info">
+          <div class="settings-name">offline production</div>
+          <div class="settings-desc">accumulate N while the game is closed</div>
+        </div>
+        <button id="btn-offline" class="settings-btn">enabled</button>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-info">
+          <div class="settings-name">notation</div>
+          <div class="settings-desc">number display format (suffix / scientific)</div>
+        </div>
+        <button id="btn-notation" class="settings-btn">suffix</button>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-info">
+          <div class="settings-name">reset confirmation</div>
+          <div class="settings-desc">show confirmation dialog before any reset</div>
+        </div>
+        <button id="btn-confirm-toggle" class="settings-btn">enabled</button>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-info">
+          <div class="settings-name">buy max</div>
+          <div class="settings-desc">buy button purchases as many levels as affordable</div>
+        </div>
+        <button id="btn-buy-max" class="settings-btn">disabled</button>
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-info">
+          <div class="settings-name">reset</div>
+          <div class="settings-desc">clear all progress and start over</div>
+        </div>
+        <button id="btn-reset" class="settings-btn danger">reset game</button>
+      </div>
+
+      <div class="settings-row" id="dev-password-row">
+        <div class="settings-info">
+          <div class="settings-name">dev</div>
+          <div class="settings-desc">enter password to unlock developer tools</div>
+        </div>
+        <form class="dev-input-group" onsubmit="return false">
+          <input id="dev-password-input" class="dev-input" type="password" placeholder="password" autocomplete="off" />
+          <button id="btn-dev-password" class="settings-btn" type="submit">unlock</button>
+        </form>
+      </div>
+
+      <div class="settings-row settings-dev">
+        <div class="settings-info">
+          <div class="settings-name">[ dev ]  N ×2</div>
+          <div class="settings-desc">multiply current N by 2 for testing</div>
+        </div>
+        <button id="btn-dev-double" class="settings-btn">×2 N</button>
+      </div>
+
+      <div class="settings-row settings-dev">
+        <div class="settings-info">
+          <div class="settings-name">[ dev ]  production boost</div>
+          <div class="settings-desc">multiply production rate (e.g. 1e6). set 1 to disable</div>
+        </div>
+        <div class="dev-input-group">
+          <input id="dev-boost-input" class="dev-input" type="text" placeholder="1e6" />
+          <button id="btn-dev-boost" class="settings-btn">set</button>
+        </div>
+      </div>
+
+      <div class="settings-row settings-dev">
+        <div class="settings-info">
+          <div class="settings-name">[ dev ]  set N</div>
+          <div class="settings-desc">accepts plain numbers or scientific (e.g. 1e50)</div>
+        </div>
+        <div class="dev-input-group">
+          <input id="dev-n-input" class="dev-input" type="text" placeholder="1e10" />
+          <button id="dev-n-btn" class="settings-btn">set</button>
+        </div>
+      </div>
+
+      <div class="settings-row settings-dev">
+        <div class="settings-info">
+          <div class="settings-name">[ dev ]  axiom count</div>
+          <div class="settings-desc">set axiomCount for current run</div>
+        </div>
+        <div class="dev-input-group">
+          <input id="dev-ax-input" class="dev-input" type="number" placeholder="0" min="0" />
+          <button id="dev-ax-btn" class="settings-btn">set</button>
+        </div>
+      </div>
+
+      <div class="settings-row settings-dev">
+        <div class="settings-info">
+          <div class="settings-name">[ dev ]  theorem count</div>
+          <div class="settings-desc">set theoremCount and force-unlock theorem</div>
+        </div>
+        <div class="dev-input-group">
+          <input id="dev-thm-input" class="dev-input" type="number" placeholder="0" min="0" />
+          <button id="dev-thm-btn" class="settings-btn">set</button>
+        </div>
+      </div>
+
+    </div>
+
+      <div class="settings-footer">
+        <span>axiom  ·  v0.1.0  ·  rednebula100</span>
+        <span id="settings-playtime">playtime: 00:00:00</span>
+      </div>
+
+  </div>
+
+  <!-- Manual panel -->
+  <div id="panel-manual" class="panel">
+    <div id="manual-column">
+
+      <!-- ── Spoiler warning ── -->
+      <div id="manual-spoiler-warning">
+        <div class="manual-spoiler-line"></div>
+        <p class="manual-spoiler-label">⚠ this manual contains spoilers</p>
+        <p class="manual-spoiler-sub">progress may be more rewarding without it.</p>
+        <div class="manual-spoiler-line"></div>
+      </div>
+
+      <!-- ── 1. OPERATIONS (always visible) ── -->
+      <div id="manual-section-ops">
+        <div class="section-header">OPERATIONS</div>
+
+        <div class="manual-block first-in-group">
+          <p class="manual-p">
+            <span class="manual-hl">N</span> is the core resource. It accumulates automatically every second and is shown in the top bar. Everything in the game is built around producing N faster and reaching the thresholds required for prestige resets.
+          </p>
+          <p class="manual-p">Base production starts at 1 N/s. Upgrades form a multiplicative chain — each upgrade amplifies the one before it.</p>
+        </div>
+
+        <div class="manual-block">
+          <div class="manual-entry">
+            <div class="manual-entry-name">Successor</div>
+            <div class="manual-entry-sub">Adds +1 N/s to base production per level. The starting upgrade, available from the beginning.</div>
+            <div class="manual-entry-sub manual-dim">cost: 10 N · scales ×1.8 per level</div>
+          </div>
+          <div class="manual-entry">
+            <div class="manual-entry-name">Addition  <span class="manual-unlock">unlocks at Successor lv.3</span></div>
+            <div class="manual-entry-sub">Introduces base value A = (level+1)<sup>1.2</sup>. Production multiplied by A raised to a power set by Multiplication.</div>
+            <div class="manual-entry-sub manual-dim">cost: 100 N · scales ×2.5 per level</div>
+          </div>
+          <div class="manual-entry">
+            <div class="manual-entry-name">Multiplication  <span class="manual-unlock">unlocks at Addition lv.2</span></div>
+            <div class="manual-entry-sub">Sets the exponent M applied to A. M = 1 + log₁₀(level+1) × 2.02. Production becomes base × A<sup>M</sup>.</div>
+            <div class="manual-entry-sub manual-dim">cost: 1,500 N · scales ×6 per level</div>
+          </div>
+          <div class="manual-entry">
+            <div class="manual-entry-name">Exponentiation  <span class="manual-unlock">unlocks later</span></div>
+            <div class="manual-entry-sub">Raises M to exponent E = 1 + log₁₀(level+1) × 0.3. Production becomes base × A<sup>(M<sup>E</sup>)</sup>.</div>
+            <div class="manual-entry-sub manual-dim">cost: 5,000 N · scales ×95 per level</div>
+          </div>
+        </div>
+
+        <div class="manual-block">
+          <p class="manual-p">Upgrade costs rise exponentially with each level. <span class="manual-hl">Buy Max</span> mode (Settings) purchases as many levels as affordable in a single click.</p>
+        </div>
+      </div>
+
+      <!-- ── 2. PRESTIGE ── -->
+      <div id="manual-section-prestige">
+        <div class="section-header manual-section-gap">PRESTIGE</div>
+
+        <div class="manual-block first-in-group">
+          <p class="manual-p">Prestige resets sacrifice current run progress in exchange for permanent multipliers that carry across all future runs. Each layer resets everything from the layer below it.</p>
+        </div>
+
+        <div class="manual-block">
+          <div class="manual-entry">
+            <div class="manual-entry-name">AXIOM  <span class="manual-unlock">first prestige layer</span></div>
+            <div class="manual-entry-sub">Resets N and all upgrade levels. Grants ×1.75 permanent production multiplier per axiom.</div>
+            <div class="manual-entry-sub manual-dim">req: 10,000 N for the first axiom · scales as 10K × 2<sup>(n × 1.09<sup>n</sup>)</sup></div>
+          </div>
+          <div class="manual-kv-group">
+            <div class="manual-kv"><span class="manual-kv-key">ax.3</span><span class="manual-kv-val">base production gains +2 N/s per total axiom (e.g. +8 N/s at ax.4)</span></div>
+            <div class="manual-kv"><span class="manual-kv-key">ax.5</span><span class="manual-kv-val">all upgrade costs permanently reduced by 25%</span></div>
+            <div class="manual-kv"><span class="manual-kv-key">ax.7</span><span class="manual-kv-val">multiplier retroactively becomes ×1.62 per axiom for all past and future axioms</span></div>
+          </div>
+        </div>
+
+        <div class="manual-block">
+          <div class="manual-entry">
+            <div class="manual-entry-name">THEOREM  <span class="manual-unlock">unlocks at ax.10</span></div>
+            <div class="manual-entry-sub">Resets N, all upgrade levels, and all axioms. Axiom multipliers are lost. Grants ×1.5 permanent production multiplier per theorem.</div>
+            <div class="manual-entry-sub manual-dim">req: 100B N for the first theorem · scales much faster than axiom</div>
+          </div>
+          <p class="manual-p">Each theorem unlocks new mechanics. The axiom multiplier is gone after a theorem reset, but the theorem multiplier replaces it at a different scale.</p>
+        </div>
+      </div>
+
+      <!-- ── 3. SEQUENCES ── -->
+      <div id="manual-section-sequences">
+        <div class="section-header manual-section-gap">SEQUENCES</div>
+
+        <div class="manual-block first-in-group">
+          <p class="manual-p">Sequences unlock at th.3. They provide a multiplier to all production and operate as the top-level prestige loop — a sequence reset resets everything below it.</p>
+        </div>
+
+        <div class="manual-block">
+          <div class="manual-entry">
+            <div class="manual-entry-name">Points (pts)</div>
+            <div class="manual-entry-sub">Performing a sequence reset earns pts based on current N, then resets N, axioms, upgrades, and theorems.</div>
+            <div class="manual-entry-sub manual-dim">formula: floor( log₃(N ÷ 500,000) )  ·  first pt at 500K N, each next needs 3× more</div>
+          </div>
+          <p class="manual-p">Pts accumulate in a reserve pool and are never reset by any action. Allocate them to sequence variables via sliders to boost the active sequence's multiplier.</p>
+        </div>
+
+        <div class="manual-block">
+          <div class="manual-entry">
+            <div class="manual-entry-name">Arithmetic Sequence  (a, a+d, a+2d, ...)</div>
+            <div class="manual-entry-sub">Buy 5 terms to complete one cycle. Each completion multiplies production by a growing factor.</div>
+            <div class="manual-entry-sub manual-dim">term cost: 50M N × 5<sup>total terms bought</sup>  ·  completion mult: ×1.3 base, increasing by step each cycle</div>
+          </div>
+          <div class="manual-kv-group">
+            <div class="manual-kv"><span class="manual-kv-key">var  a</span><span class="manual-kv-val">+10% to base multiplier per pt</span></div>
+            <div class="manual-kv"><span class="manual-kv-key">var  d</span><span class="manual-kv-val">+0.025 to per-completion step per pt  (base step: 0.1)</span></div>
+          </div>
+        </div>
+
+        <div class="manual-block">
+          <div class="manual-entry">
+            <div class="manual-entry-name">Reformulate  <span class="manual-unlock">costs 100 pts</span></div>
+            <div class="manual-entry-sub">Switches the active sequence from Arithmetic to Geometric. Resets completions. Refunds allocated pts to reserve first.</div>
+            <div class="manual-entry-sub">Each reformulate earns <span class="manual-hl">ref pts</span> equal to your reformulate count: 1st = 1 pt, 2nd = 2 pts, 3rd = 3 pts, ...</div>
+          </div>
+        </div>
+
+        <div class="manual-block">
+          <div class="manual-entry">
+            <div class="manual-entry-name">Geometric Sequence  (a, a·r, a·r², ...)</div>
+            <div class="manual-entry-sub">Same 5-term cycle structure as arithmetic, but the multiplier scales exponentially with completions.</div>
+            <div class="manual-entry-sub manual-dim">term cost: 5B N × 4<sup>total terms bought</sup></div>
+          </div>
+          <div class="manual-kv-group">
+            <div class="manual-kv"><span class="manual-kv-key">var  a</span><span class="manual-kv-val">+8% to flat multiplier per pt</span></div>
+            <div class="manual-kv"><span class="manual-kv-key">var  r</span><span class="manual-kv-val">+0.05 to ratio per pt  (base ratio: 1.5)  ·  mult = (1 + a×0.08) × ratio<sup>completions</sup></span></div>
+          </div>
+        </div>
+
+        <div class="manual-block">
+          <div class="manual-entry">
+            <div class="manual-entry-name">Ref multiplier</div>
+            <div class="manual-entry-sub">ref pts accumulate as triangular numbers: after n reformulates, total = 1+2+...+n = n(n+1)/2.</div>
+            <div class="manual-entry-sub">ref mult = 2<sup>ref pts</sup> · applied to all sequence production · never resets under any condition.</div>
+            <div class="manual-entry-sub manual-dim">example: 3 reformulates → 6 ref pts → ×2<sup>6</sup> = ×64 on top of sequence mult</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ??? (next locked section hint) ── -->
+      <div id="manual-section-unknown">
+        <div class="section-header manual-section-gap manual-unknown-header">???</div>
+        <div class="manual-block first-in-group manual-unknown-block">
+          <p class="manual-p manual-dim">???</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="autosave-toast">autosaved</div>
+
+</body>
+</html>
