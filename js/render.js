@@ -3,6 +3,7 @@
 import {
   gameState, axiomRequirement, upgradeCostMult,
   totalAxiomMult, totalTheoremMult, theoremRequirement, MILESTONES, THEOREM_MILESTONES,
+  epochState, iterState,
 } from './state.js';
 import { totalSeqMult } from './sequences.js';
 import { buildSequencesDOM, updateSequencesText } from './sequences-ui.js';
@@ -11,6 +12,9 @@ import { fmt, fmtRate } from './format.js';
 import { buyUpgrade, doAxiom, doTheorem } from './actions.js';
 import { showConfirm } from './confirm.js';
 import { buildIterationDOM, updateIterationText } from './iteration.js';
+import { sigmaState, buildSigmaAutomationDOM, updateSigmaText } from './sigma-automation.js';
+import { buildEpochDOM, updateEpochText } from './epoch.js';
+import { orbitState, buildOrbitDOM, updateOrbitText } from './orbit.js';
 
 // ── Upgrade icons ─────────────────────────────────────────────────────────────
 
@@ -176,10 +180,34 @@ function createResetCard({ id, iconHTML, label, btnId, onReset, milestones = [],
     const drawer = document.createElement('div');
     drawer.className = 'ms-drawer';
 
-    visibleMs.forEach((ms, i) => {
-      const isNext = i === unlockedCount;
-      drawer.appendChild(createMilestoneRow(ms, i === 0, msType, isNext));
-    });
+    // Group consecutive same-req unlocked milestones into branched rows
+    let rowIndex = 0;
+    let vi = 0;
+    while (vi < visibleMs.length) {
+      const ms = visibleMs[vi];
+      const isNextItem = vi === unlockedCount;
+      const isFirst = rowIndex === 0;
+
+      if (!isNextItem) {
+        // Collect all consecutive milestones sharing this req
+        const group = [ms];
+        let vj = vi + 1;
+        while (vj < visibleMs.length && vj < unlockedCount && visibleMs[vj].req === ms.req) {
+          group.push(visibleMs[vj]);
+          vj++;
+        }
+        if (group.length > 1) {
+          drawer.appendChild(createBranchedMilestoneRow(group, isFirst, msType));
+          vi = vj;
+          rowIndex++;
+          continue;
+        }
+      }
+
+      drawer.appendChild(createMilestoneRow(ms, isFirst, msType, isNextItem));
+      vi++;
+      rowIndex++;
+    }
 
     toggle.addEventListener('click', () => {
       const open = card.classList.toggle('ms-open');
@@ -191,6 +219,70 @@ function createResetCard({ id, iconHTML, label, btnId, onReset, milestones = [],
   }
 
   return card;
+}
+
+// ── Branched milestone row (multiple rewards from one req) ────────────────────
+
+function createBranchedMilestoneRow(group, isFirst, type = 'axiom') {
+  const row = document.createElement('div');
+  const baseClass = type === 'theorem' ? 'theorem-milestone-row' : 'milestone-row';
+  row.className = baseClass + ' ms-branched' + (isFirst ? ' first-in-group' : '');
+
+  const indicator = document.createElement('span');
+  indicator.className = 'ms-indicator';
+  indicator.textContent = '✓';
+
+  const req = document.createElement('span');
+  req.className = 'ms-req';
+  req.textContent = type === 'theorem' ? `th.${group[0].req}` : `ax.${group[0].req}`;
+
+  // SVG branch: entry → vertical bar → two arms
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'ms-branch-svg');
+  svg.setAttribute('width', '24');
+  svg.setAttribute('height', '44');
+  svg.setAttribute('viewBox', '0 0 24 44');
+  svg.setAttribute('aria-hidden', 'true');
+
+  function line(x1, y1, x2, y2) {
+    const l = document.createElementNS(NS, 'line');
+    l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+    l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+    l.setAttribute('stroke', '#3a5a4a');
+    l.setAttribute('stroke-width', '1');
+    return l;
+  }
+  svg.appendChild(line(0, 22, 12, 22));  // entry horizontal to fork
+  svg.appendChild(line(12, 10, 12, 34)); // vertical bar
+  svg.appendChild(line(12, 10, 24, 10)); // top arm → Logarithm
+  svg.appendChild(line(12, 34, 24, 34)); // bottom arm → Iteration
+
+  const items = document.createElement('div');
+  items.className = 'ms-branch-items';
+
+  for (const ms of group) {
+    const item = document.createElement('div');
+    item.className = 'ms-branch-item';
+
+    const name = document.createElement('span');
+    name.className = 'ms-name';
+    name.textContent = ms.name;
+
+    const desc = document.createElement('span');
+    desc.className = 'ms-desc';
+    desc.textContent = ms.descFn();
+
+    item.appendChild(name);
+    item.appendChild(desc);
+    items.appendChild(item);
+  }
+
+  row.appendChild(indicator);
+  row.appendChild(req);
+  row.appendChild(svg);
+  row.appendChild(items);
+  return row;
 }
 
 // ── Milestone row ─────────────────────────────────────────────────────────────
@@ -309,7 +401,7 @@ export function updateCardText() {
   if (axiomBtn) {
     const req      = axiomRequirement();
     const canAxiom = gameState.N.gte(req);
-    const nextTotal = totalAxiomMult(gameState.axiomCount + 1).toFixed(2);
+    const nextTotal = fmt(totalAxiomMult(gameState.axiomCount + 1));
     axiomBtn.disabled    = !canAxiom;
     axiomBtn.textContent = `axiom  [ \u00d7${nextTotal} ]`;
 
@@ -319,7 +411,7 @@ export function updateCardText() {
     if (countEl) countEl.textContent =
       `count: ${gameState.axiomCount}`;
     if (boostEl) boostEl.textContent =
-      gameState.axiomCount > 0 ? `boost: \u00d7${totalAxiomMult().toFixed(2)}` : 'boost: \u00d71.00';
+      gameState.axiomCount > 0 ? `boost: \u00d7${fmt(totalAxiomMult())}` : 'boost: \u00d71.00';
     if (reqEl)   reqEl.textContent   = `req \u2265 ${fmt(req)}`;
   }
 
@@ -328,7 +420,7 @@ export function updateCardText() {
   if (theoremBtn) {
     const req        = theoremRequirement();
     const canTheorem = gameState.N.gte(req);
-    const nextTotal  = totalTheoremMult(gameState.theoremCount + 1).toFixed(2);
+    const nextTotal  = fmt(totalTheoremMult(gameState.theoremCount + 1));
     theoremBtn.disabled    = !canTheorem;
     theoremBtn.textContent = `theorem  [ \u00d7${nextTotal} ]`;
 
@@ -338,7 +430,7 @@ export function updateCardText() {
     if (countEl) countEl.textContent =
       `count: ${gameState.theoremCount}`;
     if (boostEl) boostEl.textContent =
-      gameState.theoremCount > 0 ? `boost: \u00d7${totalTheoremMult().toFixed(2)}` : 'boost: \u00d71.00';
+      gameState.theoremCount > 0 ? `boost: \u00d7${fmt(totalTheoremMult())}` : 'boost: \u00d71.00';
     if (reqEl)   reqEl.textContent   = `req \u2265 ${fmt(req)}`;
   }
 
@@ -388,6 +480,21 @@ export function render() {
     buildIterationDOM();
   }
 
+  if (sigmaState.dirty) {
+    sigmaState.dirty = false;
+    buildSigmaAutomationDOM();
+  }
+
+  if (epochState.dirty) {
+    epochState.dirty = false;
+    buildEpochDOM();
+  }
+
+  if (orbitState.dirty) {
+    orbitState.dirty = false;
+    buildOrbitDOM();
+  }
+
   updateCardText();
 
   const settingsPanel = document.getElementById('panel-settings');
@@ -414,6 +521,9 @@ export function render() {
   const iterPanel = document.getElementById('panel-iteration');
   if (iterPanel && iterPanel.classList.contains('active')) {
     updateIterationText();
+    updateSigmaText();
+    updateEpochText();
+    updateOrbitText();
   }
 
   const seqMult = gameState.sequencesUnlocked ? totalSeqMult() : 1;
@@ -423,6 +533,15 @@ export function render() {
     const show = seqMult > 1;
     seqDivider.style.display = show ? '' : 'none';
     seqEl.style.display = show ? '' : 'none';
-    if (show) seqEl.textContent = 'seq \u00d7' + seqMult.toFixed(3);
+    if (show) seqEl.textContent = 'seq \u00d7' + fmt(seqMult);
+  }
+
+  const iterDivider = document.getElementById('topbar-iter-divider');
+  const iterEl = document.getElementById('topbar-iter');
+  if (iterDivider && iterEl) {
+    const show = iterState.count > 0;
+    iterDivider.style.display = show ? '' : 'none';
+    iterEl.style.display = show ? '' : 'none';
+    if (show) iterEl.textContent = ' \u2110: ' + iterState.count;
   }
 }

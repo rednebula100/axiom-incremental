@@ -26,6 +26,8 @@
     <span id="topbar-rate">+0.000 / s</span>
     <div id="topbar-seq-divider" class="topbar-divider" style="display:none"></div>
     <span id="topbar-seq" style="display:none"></span>
+    <div id="topbar-iter-divider" class="topbar-divider" style="display:none"></div>
+    <span id="topbar-iter" style="display:none"></span>
   </div>
 
   <!-- Tab bar -->
@@ -48,9 +50,25 @@
     <div id="sequences-column"></div>
   </div>
 
+  <!-- Iteration subtab bar (shown only when iteration panel is active) -->
+  <div id="iter-subtabbar">
+    <button class="iter-subtab active" data-iter-subtab="main">iterate</button>
+    <button class="iter-subtab" data-iter-subtab="sigma" style="display:none">sigma automation</button>
+    <button class="iter-subtab" data-iter-subtab="orbit" style="display:none">orbit</button>
+  </div>
+
   <!-- Iteration panel -->
   <div id="panel-iteration" class="panel">
-    <div id="iteration-column"></div>
+    <div id="iter-subpanel-main" class="iter-subpanel active">
+      <div id="iteration-column"></div>
+      <div id="epoch-column"></div>
+    </div>
+    <div id="iter-subpanel-sigma" class="iter-subpanel">
+      <div id="iter-sigma-column"></div>
+    </div>
+    <div id="iter-subpanel-orbit" class="iter-subpanel">
+      <div id="iter-orbit-column"></div>
+    </div>
   </div>
 
   <!-- Settings panel -->
@@ -187,11 +205,48 @@
         </div>
       </div>
 
+      <div class="settings-row settings-dev">
+        <div class="settings-info">
+          <div class="settings-name">[ dev ]  reserve pts</div>
+          <div class="settings-desc">set sequence reserve pts (capped at current pts cap)</div>
+        </div>
+        <div class="dev-input-group">
+          <input id="dev-pts-input" class="dev-input" type="number" placeholder="0" min="0" />
+          <button id="dev-pts-btn" class="settings-btn">set</button>
+        </div>
+      </div>
+
+      <div class="settings-row settings-dev">
+        <div class="settings-info">
+          <div class="settings-name">[ dev ]  set τ</div>
+          <div class="settings-desc">set current τ (tau) for orbit testing</div>
+        </div>
+        <div class="dev-input-group">
+          <input id="dev-tau-input" class="dev-input" type="number" placeholder="0" min="0" />
+          <button id="dev-tau-btn" class="settings-btn">set</button>
+        </div>
+      </div>
+
+      <div class="settings-row settings-dev">
+        <div class="settings-info">
+          <div class="settings-name">[ dev ]  τ boost</div>
+          <div class="settings-desc">multiply τ/s rate (e.g. 1e6). set 1 to disable</div>
+        </div>
+        <div class="dev-input-group">
+          <input id="dev-tau-boost-input" class="dev-input" type="text" placeholder="1e6" />
+          <button id="dev-tau-boost-btn" class="settings-btn">set</button>
+        </div>
+      </div>
+
     </div>
 
       <div class="settings-footer">
-        <span>axiom  ·  v0.1.0  ·  rednebula100</span>
+        <span>axiom  ·  v0.1.0</span>
         <span id="settings-playtime">playtime: 00:00:00</span>
+      </div>
+
+      <div class="settings-logo">
+        <img src="assets/logo.png" alt="Red Nebula" class="settings-logo-img" />
       </div>
 
   </div>

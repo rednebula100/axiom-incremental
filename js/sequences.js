@@ -1,8 +1,8 @@
 // sequences.js — Sequence state, math functions, and actions.
 // DOM rendering lives in sequences-ui.js.
 
-import { gameState } from './state.js';
-import { ARITHMETIC_SEQ, GEOMETRIC_SEQ, SEQ_RESET, REF, BASE_SCALING, COMPLETIONS_SOFTCAP } from './balance.js';
+import { gameState, epochState, reservePtsCap } from './state.js';
+import { ARITHMETIC_SEQ, EPOCH, GEOMETRIC_SEQ, SEQ_RESET, REF, BASE_SCALING, COMPLETIONS_SOFTCAP } from './balance.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -151,9 +151,10 @@ export function totalSeqMult() {
   return mult * refMult();
 }
 
-export function computeSeqPoints(N) {
-  if (N.lt(SEQ_RESET.POINTS_BASE)) return 0;
-  return Math.max(0, Math.floor(N.div(SEQ_RESET.POINTS_BASE).log10() / Math.log10(SEQ_RESET.POINTS_SCALE)));
+export function computeSeqPoints(N, totalPts = 0) {
+  const effectiveBase = SEQ_RESET.POINTS_BASE * Math.pow(SEQ_RESET.PTS_HELD_SCALE, totalPts);
+  if (N.lt(effectiveBase)) return 0;
+  return Math.max(0, Math.floor(Math.log10(N.div(effectiveBase).toNumber()) / Math.log10(SEQ_RESET.POINTS_SCALE)));
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -225,8 +226,9 @@ export function doSeqReset() {
   if (!gameState.sequencesUnlocked) return;
   const currentAlloc = Object.values(seqState.vars[seqState.activeId] || {}).reduce((s, v) => s + v, 0);
   const totalPts = seqState.reservePts + currentAlloc;
-  const earned   = computeSeqPoints(gameState.N);
-  seqState.reservePts += Math.min(earned, Math.max(0, SEQ_RESET.PTS_CAP - totalPts));
+  let earned = computeSeqPoints(gameState.N, totalPts);
+  if (epochState.epoch2 && earned > 0) earned = Math.floor(earned * EPOCH.E2_PTS_MULT);
+  seqState.reservePts += Math.min(earned, Math.max(0, reservePtsCap() - totalPts));
 
   gameState.N               = new Decimal(0);
   gameState.axiomCount      = 0;

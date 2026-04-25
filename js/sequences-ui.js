@@ -1,10 +1,12 @@
 // sequences-ui.js — DOM building and per-frame updates for the Sequences tab.
 // Pure logic (state, math, actions) lives in sequences.js.
 
-import { gameState } from './state.js';
+import { gameState, reservePtsCap } from './state.js';
 import { showConfirm } from './confirm.js';
 import { fmt } from './format.js';
-import { ARITHMETIC_SEQ, GEOMETRIC_SEQ, COMPLETIONS_SOFTCAP, SEQ_RESET } from './balance.js';
+import { ARITHMETIC_SEQ, GEOMETRIC_SEQ, COMPLETIONS_SOFTCAP } from './balance.js';
+import { save } from './save.js';
+import { sigmaState } from './sigma-automation.js';
 import {
   seqState, SEQ_TERMS_NEEDED, SEQ_DEFS,
   arithmeticTermCost, arithmeticCompletionsMult,
@@ -99,7 +101,7 @@ export function buildSequencesDOM() {
 
   const seqResetBtn = el('button', 'seq-panel-btn', 'sequence reset');
   seqResetBtn.id = 'seq-reset-btn';
-  seqResetBtn.addEventListener('click', () => showConfirm('perform sequence reset?', doSeqReset));
+  seqResetBtn.addEventListener('click', () => showConfirm('perform sequence reset?', () => { doSeqReset(); sigmaState.elapsed = 0; sigmaState.currentSlot = 0; save(); }));
   resetCard.appendChild(seqResetBtn);
 
   col.appendChild(resetCard);
@@ -326,8 +328,8 @@ export function updateSequencesText() {
       const nxtMult = arithmeticCompletionsMult(d, 1) * (1 + a * ARITHMETIC_SEQ.A_BOOST_PER_PT);
       rows = [
         { label: 'completions', val: String(comps) },
-        { label: 'mult',        val: '\u00d7' + curMult.toFixed(3) + (capped ? '  \u00b7 softcapped' : ''), softcap: capped },
-        { label: 'next',        val: '\u00d7' + nxtMult.toFixed(3) },
+        { label: 'mult',        val: '\u00d7' + fmt(curMult) + (capped ? '  \u00b7 softcapped' : ''), softcap: capped },
+        { label: 'next',        val: '\u00d7' + fmt(nxtMult) },
         { label: 'cost',        val: fmt(cost) + ' N', dim: !gameState.N.gte(cost) },
       ];
     } else if (activeId === 'geometric') {
@@ -339,8 +341,8 @@ export function updateSequencesText() {
       const nxtMult = geometricMult_at(a, r, comps + 1);
       rows = [
         { label: 'completions', val: String(comps) },
-        { label: 'mult',        val: '\u00d7' + curMult.toFixed(3) + (capped ? '  \u00b7 softcapped' : ''), softcap: capped },
-        { label: 'next',        val: '\u00d7' + nxtMult.toFixed(3) },
+        { label: 'mult',        val: '\u00d7' + fmt(curMult) + (capped ? '  \u00b7 softcapped' : ''), softcap: capped },
+        { label: 'next',        val: '\u00d7' + fmt(nxtMult) },
         { label: 'ratio',       val: geometricRatio(r).toFixed(3) },
         { label: 'cost',        val: fmt(cost) + ' N', dim: !gameState.N.gte(cost) },
       ];
@@ -363,7 +365,12 @@ export function updateSequencesText() {
 
   // Reformulate card
   const refBtn = col.querySelector('[data-reformulate-btn]');
-  if (refBtn) refBtn.disabled = totalPts < GEOMETRIC_SEQ.REFORMULATE_COST;
+  if (refBtn) {
+    const activeCost = activeId === 'arithmetic'
+      ? GEOMETRIC_SEQ.REFORMULATE_COST
+      : GEOMETRIC_SEQ.NEXT_REFORMULATE_COST;
+    refBtn.disabled = totalPts < activeCost;
+  }
 
   const refFill    = col.querySelector('[data-ref-fill]');
   const refCountEl = col.querySelector('[data-ref-count]');
@@ -381,11 +388,11 @@ export function updateSequencesText() {
 
   // Reset card
   const previewEl = col.querySelector('[data-seq-pts-preview]');
-  if (previewEl) previewEl.textContent = `current N: ${fmt(gameState.N)}   \u2192   +${computeSeqPoints(gameState.N)} pts`;
+  if (previewEl) previewEl.textContent = `current N: ${fmt(gameState.N)}   \u2192   +${computeSeqPoints(gameState.N, totalPts)} pts`;
   const ptsCapFill  = col.querySelector('[data-pts-cap-fill]');
   const ptsCapCount = col.querySelector('[data-pts-cap-count]');
   if (ptsCapFill && ptsCapCount) {
-    const cap   = SEQ_RESET.PTS_CAP;
+    const cap   = reservePtsCap();
     const atCap = totalPts >= cap;
     ptsCapFill.style.width = Math.min(100, (totalPts / cap) * 100).toFixed(2) + '%';
     ptsCapFill.className   = 'seq-pts-cap-bar-fill' + (atCap ? ' pts-cap-full' : '');
@@ -396,7 +403,7 @@ export function updateSequencesText() {
   const refDisplayEl = col.querySelector('[data-seq-ref-display]');
   if (refDisplayEl) {
     if (seqState.refCount > 0) {
-      refDisplayEl.textContent = `ref: ${seqState.refPts} pts  \u00b7  mult: \u00d7${refMult().toFixed(3)}`;
+      refDisplayEl.textContent = `ref: ${seqState.refPts} pts  \u00b7  mult: \u00d7${fmt(refMult())}`;
       refDisplayEl.style.display = '';
     } else {
       refDisplayEl.style.display = 'none';
@@ -404,7 +411,7 @@ export function updateSequencesText() {
   }
 
   const seqResetBtn = document.getElementById('seq-reset-btn');
-  if (seqResetBtn) seqResetBtn.disabled = computeSeqPoints(gameState.N) === 0 || totalPts >= SEQ_RESET.PTS_CAP;
+  if (seqResetBtn) seqResetBtn.disabled = computeSeqPoints(gameState.N, totalPts) === 0 || totalPts >= reservePtsCap();
 
   // Geo upgrade card (only present when geometric active + unlocked)
   const geoUpgCard = col.querySelector('[data-geo-upg="baseScaling"]');

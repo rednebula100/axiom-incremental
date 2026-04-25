@@ -1,25 +1,26 @@
 // iteration.js — Iteration prestige layer: ℐ system.
 // Sits above Theorems and Sequences; resets all of layer 0.
 
-import { gameState } from './state.js';
+import { gameState, iterState } from './state.js';
 import { showConfirm } from './confirm.js';
 import { fmt } from './format.js';
 import { ITER } from './balance.js';
 import { seqState, resetSeqState } from './sequences.js';
-
-// ── State ─────────────────────────────────────────────────────────────────────
-
-export const iterState = {
-  count: 0,  // cumulative ℐ, never resets
-};
+import { sigmaState } from './sigma-automation.js';
+import { save } from './save.js';
 
 // ── Math ──────────────────────────────────────────────────────────────────────
 
-// floor(log10(N+1)^K) — returns 0 for N=0, grows with N magnitude
+// floor(log10(N+1)^K / SCALE) — returns 0 for N=0, earns 1 at N=1Ud (1e36)
 export function computeIter(N) {
   if (N.lte(0)) return 0;
   const log10 = N.add(1).log10();  // break_infinity returns plain JS number
-  return Math.max(0, Math.floor(Math.pow(log10, ITER.K)));
+  return Math.max(0, Math.floor(Math.pow(log10, ITER.K) / ITER.SCALE));
+}
+
+// N needed to earn exactly k ℐ: 10^(sqrt(k * SCALE))
+export function iterThreshold(k) {
+  return new Decimal(10).pow(Math.sqrt(k * ITER.SCALE));
 }
 
 // (ℐ + 1)^MULT_EXP — neutral at 0 ℐ, meaningful after first iteration
@@ -58,9 +59,14 @@ export function doIter() {
   const seqTab = document.getElementById('tab-sequences');
   if (seqTab) seqTab.style.display = 'none';
 
+  sigmaState.elapsed     = 0;
+  sigmaState.currentSlot = 0;
+
   gameState.domDirty    = true;
   gameState.seqDomDirty = true;
   gameState.itDomDirty  = true;
+
+  save();
 }
 
 // ── DOM helper ────────────────────────────────────────────────────────────────
@@ -108,9 +114,10 @@ export function buildIterationDOM() {
 
   // Stat rows
   const rows = [
-    { label: 'earn',       attr: 'iterEarn',  extra: '' },
-    { label: 'total ℐ',   attr: 'iterTotal', extra: '' },
-    { label: 'production', attr: 'iterMult',  extra: 'iter-val-mult' },
+    { label: 'earn',        attr: 'iterEarn',   extra: '' },
+    { label: 'next ℐ at', attr: 'iterNextAt', extra: 'iter-val-dim' },
+    { label: 'total ℐ', attr: 'iterTotal',  extra: '' },
+    { label: 'production',  attr: 'iterMult',   extra: 'iter-val-mult' },
   ];
   for (const { label, attr, extra } of rows) {
     const row = el('div', 'iter-stat-row');
@@ -123,12 +130,12 @@ export function buildIterationDOM() {
 
   card.appendChild(el('div', 'iter-divider'));
   card.appendChild(el('div', 'iter-warning',
-    'costs everything  \u00b7  all progress resets  \u00b7  a new layer begins'));
+    'costs everything  ·  all progress resets  ·  a new layer begins'));
 
   const btn = el('button', 'iterate-btn', '[ iterate ]');
   btn.dataset.iterBtn = '';
   btn.addEventListener('click', () =>
-    showConfirm('perform iteration? all layer\u00a00 progress resets.', doIter));
+    showConfirm('perform iteration? all layer 0 progress resets.', doIter));
   card.appendChild(btn);
 
   col.appendChild(card);
@@ -137,17 +144,20 @@ export function buildIterationDOM() {
 // ── Per-frame update ──────────────────────────────────────────────────────────
 
 export function updateIterationText() {
-  const earned = computeIter(gameState.N);
-  const total  = iterState.count;
-  const mult   = iterMult();
+  const earned   = computeIter(gameState.N);
+  const total    = iterState.count;
+  const mult     = iterMult();
+  const nextAt   = iterThreshold(earned + 1);
 
-  const earnEl  = document.querySelector('[data-iter-earn]');
-  const totalEl = document.querySelector('[data-iter-total]');
-  const multEl  = document.querySelector('[data-iter-mult]');
-  const btnEl   = document.querySelector('[data-iter-btn]');
+  const earnEl   = document.querySelector('[data-iter-earn]');
+  const nextAtEl = document.querySelector('[data-iter-next-at]');
+  const totalEl  = document.querySelector('[data-iter-total]');
+  const multEl   = document.querySelector('[data-iter-mult]');
+  const btnEl    = document.querySelector('[data-iter-btn]');
 
-  if (earnEl)  earnEl.textContent  = '+' + earned + ' \u2110';
-  if (totalEl) totalEl.textContent = total + ' \u2110';
-  if (multEl)  multEl.textContent  = '\u00d7' + (mult <= 1 ? '1.000' : mult.toFixed(3));
-  if (btnEl)   btnEl.disabled      = earned <= 0;
+  if (earnEl)   earnEl.textContent   = '+' + earned + ' ℐ';
+  if (nextAtEl) nextAtEl.textContent = fmt(nextAt) + ' N';
+  if (totalEl)  totalEl.textContent  = total + ' ℐ';
+  if (multEl)   multEl.textContent   = '×' + (mult <= 1 ? '1.000' : mult.toFixed(3));
+  if (btnEl)    btnEl.disabled       = earned <= 0;
 }

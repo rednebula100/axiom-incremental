@@ -1,9 +1,11 @@
 // production.js — Computes total N/s production each frame.
 
-import { gameState, totalAxiomMult, totalTheoremMult, totalSigmaMult } from './state.js';
+import { gameState, totalAxiomMult, totalTheoremMult, totalSigmaMult, epochState } from './state.js';
 import { totalSeqMult } from './sequences.js';
 import { iterMult } from './iteration.js';
-import { AXIOM, SIGMA } from './balance.js';
+import { epoch1IterBoost } from './epoch.js';
+import { orbitNBoost, orbitSeqBoost } from './orbit.js';
+import { AXIOM, SIGMA, EPOCH, ITER } from './balance.js';
 
 export function computeProduction() {
   const [successor, addition, multiplication, exponentiation] = gameState.upgrades;
@@ -47,15 +49,39 @@ export function computeProduction() {
     base = base.mul(new Decimal(totalSigmaMult()));
   }
 
-  // Sequence multiplier
+  // Sequence multiplier (with optional orbit resonance boost)
   if (gameState.sequencesUnlocked) {
-    const sMult = totalSeqMult();
-    if (sMult > 1) base = base.mul(new Decimal(sMult));
+    const sMult     = totalSeqMult();
+    const seqBoost  = orbitSeqBoost();
+    const effective = sMult * seqBoost;
+    if (effective > 1) base = base.mul(new Decimal(effective));
   }
 
-  // Iteration multiplier (outermost — applied last)
+  // Iteration multiplier
   const iMult = iterMult();
   if (iMult > 1) base = base.mul(new Decimal(iMult));
+
+  // ax.20 log boost: log10(axioms+1)^k
+  if (gameState.axiomCount >= ITER.UNLOCK_AT_AX) {
+    const logBoost = Math.pow(Math.log10(gameState.axiomCount + 1), AXIOM.AX20_LOG_EXP);
+    if (logBoost > 1) base = base.mul(new Decimal(logBoost));
+  }
+
+  // Orbit N amplifier: production × τ^k
+  const nBoost = orbitNBoost();
+  if (nBoost > 1) base = base.mul(new Decimal(nBoost));
+
+  // Epoch 1 boosts (outermost — applied last)
+  if (epochState.epoch1) {
+    base = base.mul(new Decimal(EPOCH.E1_FLAT_BOOST));
+    const iterBoost = epoch1IterBoost();
+    if (iterBoost > 1) base = base.mul(new Decimal(iterBoost));
+  }
+
+  // Epoch 2 N boost
+  if (epochState.epoch2) {
+    base = base.mul(new Decimal(EPOCH.E2_N_BOOST));
+  }
 
   return base;
 }

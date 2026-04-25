@@ -3,7 +3,7 @@
 
 import {
   SUCCESSOR, ADDITION, MULTIPLICATION, EXPONENTIATION,
-  AXIOM, THEOREM, SIGMA, ARITHMETIC_SEQ, ITER,
+  AXIOM, THEOREM, SIGMA, ARITHMETIC_SEQ, ITER, EPOCH, SEQ_RESET, EPOCH3,
 } from './balance.js';
 
 export const upgradeDefs = [
@@ -61,7 +61,14 @@ export const upgradeDefs = [
       lvl === 0
         ? 'n ^ n \u2003 A^(M^E) \u2003 [exp for Mult]'
         : `E = ${(1 + Math.log10(lvl + 1) * EXPONENTIATION.EFFECT_COEFF).toFixed(3)}`,
-    costFn: (lvl) => new Decimal(EXPONENTIATION.COST_BASE).mul(new Decimal(EXPONENTIATION.COST_SCALE).pow(lvl)),
+    costFn: (lvl) => {
+      let cost = new Decimal(EXPONENTIATION.COST_BASE).mul(new Decimal(EXPONENTIATION.COST_SCALE).pow(lvl));
+      if (epochState.epoch3 && iterState.count > 0) {
+        const reducer = Math.min(1, 1 / Math.pow(Math.log10(iterState.count + 1), EPOCH3.EXP_COST_K));
+        cost = cost.mul(new Decimal(reducer));
+      }
+      return cost;
+    },
     effectExpExp: (lvl) => 1 + Math.log10(lvl + 1) * EXPONENTIATION.EFFECT_COEFF,
     level: 0,
     unlocked: false,
@@ -69,6 +76,21 @@ export const upgradeDefs = [
     iconId: 'icon-exponentiation',
   },
 ];
+
+export const iterState = {
+  count: 0,  // cumulative ℐ, never resets
+};
+
+export const epochState = {
+  epoch1: false,
+  epoch2: false,
+  epoch3: false,
+  dirty:  true,
+};
+
+export function reservePtsCap() {
+  return epochState.epoch1 ? EPOCH.E1_PTS_CAP : SEQ_RESET.PTS_CAP;
+}
 
 export const gameState = {
   N: null,           // set by initState() — never call new Decimal at module level
@@ -131,13 +153,24 @@ export function totalAxiomMult(count) {
     : Math.pow(AXIOM.MULT_PER_AXIOM, count);
 }
 
+function fmtMult(n) {
+  if (n < 1e3)  return n.toFixed(3);
+  if (n < 1e6)  return (n / 1e3).toFixed(3)  + 'K';
+  if (n < 1e9)  return (n / 1e6).toFixed(3)  + 'M';
+  if (n < 1e12) return (n / 1e9).toFixed(3)  + 'B';
+  if (n < 1e15) return (n / 1e12).toFixed(3) + 'T';
+  if (n < 1e18) return (n / 1e15).toFixed(3) + 'Qa';
+  if (n < 1e21) return (n / 1e18).toFixed(3) + 'Qi';
+  return n.toExponential(3);
+}
+
 // Milestones: only appear when unlocked (axiomCount >= req).
 // descFn() is called at render time so scaling values stay current.
 export const MILESTONES = [
   {
     req: 1,
     name: 'First Axiom',
-    descFn: () => `\u00d7${totalAxiomMult().toFixed(2)} prod  [\u00d7${AXIOM.MULT_PER_AXIOM}/ax]`,
+    descFn: () => `\u00d7${fmtMult(totalAxiomMult())} prod  [\u00d7${AXIOM.MULT_PER_AXIOM}/ax]`,
   },
   {
     req: AXIOM.RECURSION_AX,
@@ -152,12 +185,20 @@ export const MILESTONES = [
   {
     req: AXIOM.MULT_THRESHOLD,
     name: 'Resonance',
-    descFn: () => `axiom \u00d7${AXIOM.MULT_PER_AXIOM_HIGH}/reset  [\u00d7${totalAxiomMult().toFixed(2)} total]`,
+    descFn: () => `axiom \u00d7${AXIOM.MULT_PER_AXIOM_HIGH}/reset\n[\u00d7${fmtMult(totalAxiomMult())} total]`,
   },
   {
     req: THEOREM.UNLOCK_AT_AX,
     name: 'Transcendence',
     descFn: () => `unlocks Theorem`,
+  },
+  {
+    req: ITER.UNLOCK_AT_AX,
+    name: 'Logarithm',
+    descFn: () => {
+      const boost = Math.pow(Math.log10(gameState.axiomCount + 1), AXIOM.AX20_LOG_EXP);
+      return `×${boost.toFixed(3)}  [log(ax+1)^${AXIOM.AX20_LOG_EXP}]`;
+    },
   },
   {
     req: ITER.UNLOCK_AT_AX,

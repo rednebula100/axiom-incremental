@@ -8,6 +8,8 @@ import { initTabs } from './tabs.js';
 import { fmt } from './format.js';
 import { ENGINE, THEOREM, ARITHMETIC_SEQ, ITER } from './balance.js';
 import { setupParticles, tickParticles } from './particles.js';
+import { tickSigmaAutomation } from './sigma-automation.js';
+import { tickOrbit } from './orbit.js';
 
 // ── Unlock checks ────────────────────────────────────────────────────────────
 
@@ -50,6 +52,9 @@ function update(delta) {
   const prod = computeProduction();
   const boost = gameState.devBoost > 1 ? new Decimal(gameState.devBoost) : new Decimal(1);
   gameState.N = gameState.N.add(prod.mul(boost).mul(new Decimal(delta)));
+
+  tickSigmaAutomation(delta);
+  tickOrbit(delta);
 
   if (Date.now() - gameState.lastSave > gameState.autosaveInterval * 1000) {
     save();

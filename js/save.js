@@ -1,8 +1,9 @@
 // save.js — Serialize / deserialize game state to localStorage, plus export/import.
 
-import { gameState } from './state.js';
+import { gameState, iterState, epochState } from './state.js';
 import { seqState } from './sequences.js';
-import { iterState } from './iteration.js';
+import { sigmaState } from './sigma-automation.js';
+import { orbitState } from './orbit.js';
 
 const SAVE_KEY = 'axiom_save_v1';
 
@@ -60,6 +61,18 @@ export function save() {
     seqGeoBaseScalingUnlocked: seqState.geoUpgrades.baseScaling.unlocked,
     iterCount:         iterState.count,
     iterationUnlocked: gameState.iterationUnlocked,
+    sigmaFreq:         sigmaState.freq,
+    sigmaSlots:        sigmaState.slots,
+    sigmaAmpLevel:     sigmaState.ampLevel,
+    epoch1:            epochState.epoch1,
+    epoch2:            epochState.epoch2,
+    epoch3:            epochState.epoch3,
+    orbitTau:          orbitState.tau,
+    orbitLayers:       orbitState.layers,
+    orbitSpeedLevels:  orbitState.speedLevels,
+    orbitGainLevels:   orbitState.gainLevels,
+    orbitNBoostLevel:  orbitState.nBoostLevel,
+    orbitSeqBoostLevel: orbitState.seqBoostLevel,
     timestamp: Date.now(),
   };
   localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -111,7 +124,33 @@ export function load() {
     if (data.seqRefCount !== undefined) seqState.refCount = data.seqRefCount;
     if (data.seqGeoBaseScalingLevel    !== undefined) seqState.geoUpgrades.baseScaling.level    = data.seqGeoBaseScalingLevel;
     if (data.seqGeoBaseScalingUnlocked !== undefined) seqState.geoUpgrades.baseScaling.unlocked = data.seqGeoBaseScalingUnlocked;
-    if (data.iterCount !== undefined) iterState.count = data.iterCount;
+    if (data.iterCount   !== undefined) iterState.count  = data.iterCount;
+    if (data.sigmaFreq  !== undefined) sigmaState.freq  = data.sigmaFreq;
+    if (data.sigmaAmpLevel !== undefined) sigmaState.ampLevel = data.sigmaAmpLevel;
+    if (data.sigmaSlots !== undefined) {
+      sigmaState.slots = data.sigmaSlots;
+      const targetSlots = epochState.epoch3 ? 4 : 3;
+      while (sigmaState.slots.length < targetSlots) sigmaState.slots.push(null);
+    }
+    if (data.epoch1 !== undefined) epochState.epoch1 = data.epoch1;
+    if (data.epoch2 !== undefined) epochState.epoch2 = data.epoch2;
+    if (data.epoch3 !== undefined) epochState.epoch3 = data.epoch3;
+
+    if (data.orbitTau          !== undefined) orbitState.tau          = data.orbitTau;
+    if (data.orbitLayers       !== undefined) {
+      orbitState.layers = data.orbitLayers;
+      orbitState.angles = new Array(orbitState.layers).fill(0);
+    }
+    if (data.orbitSpeedLevels  !== undefined) orbitState.speedLevels  = data.orbitSpeedLevels;
+    if (data.orbitGainLevels   !== undefined) orbitState.gainLevels   = data.orbitGainLevels;
+    if (data.orbitNBoostLevel  !== undefined) orbitState.nBoostLevel  = data.orbitNBoostLevel;
+    if (data.orbitSeqBoostLevel !== undefined) orbitState.seqBoostLevel = data.orbitSeqBoostLevel;
+
+    if (epochState.epoch2) {
+      const orbitTab = document.querySelector('[data-iter-subtab="orbit"]');
+      if (orbitTab) orbitTab.style.display = '';
+    }
+
     if (data.iterationUnlocked !== undefined) {
       gameState.iterationUnlocked = data.iterationUnlocked;
       if (gameState.iterationUnlocked) {

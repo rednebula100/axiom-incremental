@@ -1,10 +1,14 @@
 // tabs.js — Tab switching, settings panel, and developer tools.
 
-import { gameState } from './state.js';
+import { gameState, reservePtsCap } from './state.js';
+import { seqState } from './sequences.js';
+import { orbitState } from './orbit.js';
 import { save, exportSave, importSave } from './save.js';
 import { ENGINE } from './balance.js';
 
 export function initTabs() {
+  const iterSubtabbar = document.getElementById('iter-subtabbar');
+
   // ── Tab switching ─────────────────────────────────────────────────────────
   document.querySelectorAll('.tab').forEach((tab) => {
     tab.addEventListener('click', () => {
@@ -13,6 +17,18 @@ export function initTabs() {
       document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById(`panel-${target}`).classList.add('active');
+      iterSubtabbar.classList.toggle('visible', target === 'iteration');
+    });
+  });
+
+  // ── Iteration subtab switching ─────────────────────────────────────────────
+  document.querySelectorAll('.iter-subtab').forEach((subtab) => {
+    subtab.addEventListener('click', () => {
+      const target = subtab.dataset.iterSubtab;
+      document.querySelectorAll('.iter-subtab').forEach((t) => t.classList.remove('active'));
+      document.querySelectorAll('.iter-subpanel').forEach((p) => p.classList.remove('active'));
+      subtab.classList.add('active');
+      document.getElementById(`iter-subpanel-${target}`).classList.add('active');
     });
   });
 
@@ -99,6 +115,30 @@ export function initTabs() {
     gameState.theoremCount = val;
     if (val >= 1) gameState.theoremUnlocked = true;
     gameState.domDirty = true;
+    gameState.seqDomDirty = true;
+  });
+
+  // ── Dev: set τ ───────────────────────────────────────────────────────────
+  document.getElementById('dev-tau-btn').addEventListener('click', () => {
+    const val = parseFloat(document.getElementById('dev-tau-input').value);
+    if (isNaN(val) || val < 0) return;
+    orbitState.tau = val;
+  });
+
+  // ── Dev: τ boost ─────────────────────────────────────────────────────────
+  document.getElementById('dev-tau-boost-btn').addEventListener('click', () => {
+    const raw = document.getElementById('dev-tau-boost-input').value.trim();
+    if (!raw) return;
+    const val = parseFloat(raw);
+    if (isNaN(val) || val <= 0) return;
+    orbitState.devTauBoost = val;
+  });
+
+  // ── Dev: set reserve pts ─────────────────────────────────────────────────
+  document.getElementById('dev-pts-btn').addEventListener('click', () => {
+    const val = parseInt(document.getElementById('dev-pts-input').value, 10);
+    if (isNaN(val) || val < 0) return;
+    seqState.reservePts = Math.min(val, reservePtsCap());
     gameState.seqDomDirty = true;
   });
 
